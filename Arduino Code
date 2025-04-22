@@ -1,0 +1,400 @@
+#include "DualG2HighPowerMotorShield.h"
+DualG2HighPowerMotorShield18v18 md;
+
+int upperLimit = 0; //high until pressed
+int lowerLimit = 0; //high until limit is pressed
+
+#define verticalSpeed  0 //if positive up if negative down
+#define horizontalSpeed  0 //if positive forward if negative backwards
+#define maxSpeed  200 //400 is most motor can do
+
+#define SERIAL_PORT_SPEED  115200
+
+#define RC_NUM_CHANNELS  2 // one for up down and one for left right 
+
+#define RC_CH1  0 // vertical stick
+#define RC_CH2  1 // horizontal stick
+
+#define RC_CH1_INPUT  3 //pin 
+#define RC_CH2_INPUT  2 //pin
+
+uint16_t RC_VALUES[RC_NUM_CHANNELS];
+uint32_t RC_START[RC_NUM_CHANNELS];
+volatile uint16_t RC_SHARED[RC_NUM_CHANNELS];
+
+uint16_t RC_LOW[RC_NUM_CHANNELS] = { 1000, 0 }; //low values from the RC
+uint16_t RC_MID[RC_NUM_CHANNELS] = { 1500, 300 }; // mid values from the RC
+uint16_t RC_HIGH[RC_NUM_CHANNELS] = { 2000, 600 }; // high values from the RC
+
+uint16_t RC_FAILSAFE_VALUE[RC_NUM_CHANNELS] = { 1300, 1508 }; // values to set to if failsafe is triggered
+
+// The RC Channel mode helps us know how to use and refine the signal
+// Settings are:
+// 0 = a joystick with a centerpoint (deadzone in middle)
+// 1 = a throttle that goes from low to high (deadzone at start)
+// 2 = a a switch (either on or off)
+uint16_t RC_CHANNEL_MODE[RC_NUM_CHANNELS] = { 0, 0 };
+
+// a place to store our mapped values
+float RC_TRANSLATED_VALUES[RC_NUM_CHANNELS];
+
+// some boundaries for our mapped values
+float RC_TRANSLATED_LOW[RC_NUM_CHANNELS] = { -100, -100};
+float RC_TRANSLATED_MID[RC_NUM_CHANNELS] = { 0, 0 };
+float RC_TRANSLATED_HIGH[RC_NUM_CHANNELS] = { 100, 100 };
+
+// Do we need to invert the input? 1 = yes, 0 = no
+// Use this if your joystick goes the wrong way
+uint16_t RC_INVERT[RC_NUM_CHANNELS] = { 0, 0};
+
+// What percentage deadzone is allowed? values in percent e.g. 10 = 10%
+uint16_t RC_DZPERCENT[RC_NUM_CHANNELS] = { 30, 30 };
+
+
+// motor controller failsafe 
+void stopIfFault()
+{
+  if (md.getM1Fault()) // condition if motor 1 fails 
+  {
+    md.disableDrivers();
+    delay(1);
+    Serial.println("M1 fault");
+    while (1);
+  }
+  if (md.getM2Fault()) // condition if motor 2 fails 
+  {
+    md.disableDrivers();
+    delay(1);
+    Serial.println("M2 fault");
+    while (1);
+  }
+}
+
+
+//setup code that runs once 
+void setup() {
+  Serial.begin(SERIAL_PORT_SPEED); //speed for arduino to transmit to computer when plugged in
+
+  pinMode(RC_CH1_INPUT, INPUT); // marks the channel 1 pin as an input 
+  pinMode(RC_CH2_INPUT, INPUT); // marks the channel 2 pin as an input
+
+  attachInterrupt(digitalPinToInterrupt(RC_CH1_INPUT), READ_RC1, CHANGE); // read digital interrupts when the values from these pins change 
+  attachInterrupt(digitalPinToInterrupt(RC_CH2_INPUT), READ_RC2, CHANGE);
+  
+  pinMode (11, INPUT); //Upper Limit Switch
+
+  pinMode (5, INPUT); //Lower Limit Switch
+
+
+  //initialize motor controller 
+  Serial.println("Dual G2 High Power Motor Shield");
+  md.init();
+  md.calibrateCurrentOffsets();
+ 
+  delay(10);
+ 
+  // Uncomment to flip a motor's direction:
+  //md.flipM1(true);
+  //md.flipM2(true);
+}
+
+unsigned long current = 0; //current time 
+
+unsigned long prev = 0; //last recorded time 
+
+const unsigned long interval = 100000UL; // interval between reading values to send to computer 
+
+bool failsafeActive = true; // failsafe that gets turned off if we recieve conroller signal
+
+void loop() {
+
+  rc_read_values(); // read values from the RC
+
+  processFailsafe(); // check failsafe conditions 
+
+  rc_invert_values(); // invert values if needed
+
+  if (failsafeActive == false) {
+    rc_deadzone_adjust(); // add deadzone to the sticks 
+  }
+
+  rc_translate_values(); // translate rc values to a percentage 
+
+  upperLimit = digitalRead(11); // check upper limit switch
+
+  lowerLimit = digitalRead(5); // check lower limit switch 
+
+  md.enableDrivers(); // enable motor drivers for the speed controller 
+
+  delay(1);  // The drivers require a maximum of 1ms to elapse when brought out of sleep mode.
+
+  if(RC_TRANSLATED_VALUES[0] > 0 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
+  {
+    md.setM2Speed(0); // stop other motor 
+    int speed = 0; // value to calculate speed 
+    if(verticalSpeed < maxSpeed){ // see if we are at max speed
+      speed = verticalSpeed + 1; //increase speed
+    } else {
+      speed = verticalSpeed; // maintain speed
+    }
+
+    md.setM1Speed(speed); // send speed to the motor 
+
+    stopIfFault(); // disable if problems 
+
+    if (speed%200 == 100) // print to console 
+    {
+      Serial.print("M1 current: ");
+      Serial.println(md.getM1CurrentMilliamps());
+    }
+
+    delay(2);
+  }
+  else if(RC_TRANSLATED_VALUES[0] < 0 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
+  {
+    md.setM2Speed(0); // stop other motor 
+    int speed = 0; // value to calculate speed
+    if(verticalSpeed > (-1 * maxSpeed)){ // see if we are at max negative speed
+      speed = verticalSpeed - 1; // increase speed in negative direction 
+    } else {
+      speed = verticalSpeed; // maintain speed 
+    }
+
+    md.setM1Speed(speed); // send speed to motor 
+
+    stopIfFault(); // disable if problems 
+
+    if (speed%200 == 100) // print to console 
+    {
+      Serial.print("M1 current: ");
+      Serial.println(md.getM1CurrentMilliamps());
+    }
+    delay(2);
+  }
+  else if(RC_TRANSLATED_VALUES[1] > 0) // if signal to move forwards
+  {
+    md.setM1Speed(0); // stop other motor 
+    int speed = 0; //value to set speed
+    if(horizontalSpeed < maxSpeed){ // if we are not yet at max speed
+      speed = horizontalSpeed + 1; // increase speed
+    } else {
+      speed = horizontalSpeed; // maintain speed
+    }
+    md.setM2Speed(speed);  // send speed to motor
+
+    stopIfFault(); // disable if issues
+    if (speed%200 == 100)
+    {
+      Serial.print("M2 current: ");
+      Serial.println(md.getM2CurrentMilliamps());
+    }
+    delay(2);
+  }
+  else if(RC_TRANSLATED_VALUES[1] < 0) //backwards
+  {
+    md.setM1Speed(0); // stop other motor 
+    int speed = 0; // value to hold speed 
+    if(horizontalSpeed > (-1 * maxSpeed)){ // see if we are at max negative speed
+      speed = horizontalSpeed - 1; // lower speed
+    } else {
+      speed = horizontalSpeed; // maintain speed
+    }
+    md.setM2Speed(speed); // send speed to motor 
+
+    stopIfFault(); // disable if issues 
+
+    if (speed%200 == 100)
+    {
+      Serial.print("M2 current: ");
+      Serial.println(md.getM2CurrentMilliamps());
+    }
+    delay(2);
+  }
+  else // if no input 
+  { // turn off all motors 
+    md.setM1Speed(0);
+    md.setM2Speed(0);
+    stopIfFault();
+  }
+
+  // keep track of time
+  current = micros();
+
+
+  // all for plotting values to the console 
+  // put your main code here, to run repeatedly:
+  // This is our plotter Chart output, we only do it every so often or the plotter moves too fast
+  if (current - prev >= interval) {
+    prev += interval;
+
+    // loop through all channels and display value
+    // note: the plotter only holds 8 values, if you add more than 5 plus the min, mid and max here it
+    // will not show all your plots!
+
+    for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+      Serial.print("CH");
+      Serial.print(i);
+      Serial.print(":");
+      Serial.print(RC_TRANSLATED_VALUES[i]);
+      Serial.print(",");
+    }
+
+    //Use Ch1 as a reference point for low and high and plot them
+    Serial.print("LOW:");
+    Serial.print(RC_TRANSLATED_LOW[0]);
+    Serial.print(",");
+    Serial.print("HIGH:");
+    Serial.print(RC_TRANSLATED_HIGH[0]);
+
+    // if failsafe is active, display on the serial but also plot it as a visual aid
+    if (failsafeActive == true) {
+      Serial.println(",FAILSAFE:3500");
+    } else {
+      Serial.println("");
+    }
+  }
+}
+
+// read input for channel 1
+void READ_RC1() {
+  Read_Input(RC_CH1, RC_CH1_INPUT);
+}
+
+// read input for channel 2
+void READ_RC2() {
+  Read_Input(RC_CH2, RC_CH2_INPUT);
+}
+
+//read input 
+void Read_Input(uint8_t channel, uint8_t input_pin){
+  if (digitalRead(input_pin) == HIGH){
+    RC_START[channel] = micros();
+  } else {
+    uint16_t rc_compare = (uint16_t)(micros() - RC_START[channel]);
+    RC_SHARED[channel] = rc_compare;
+  }
+}
+
+// reads values while pausing interrupts 
+void rc_read_values(){
+  noInterrupts();
+  memcpy(RC_VALUES, (const void *)RC_SHARED, sizeof(RC_SHARED));
+  interrupts();
+}
+
+// apply the deadzone
+void rc_deadzone_adjust() {
+
+  // Lets convert our range into -100 to 100 so we can compare against our deadzone percent
+  for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+    // first off, we cant divide by zero so lets get that out the way
+
+    float newval = 0;
+
+    if (RC_CHANNEL_MODE[i] == 0) {
+      // if this is a joystick with a midpoint, our deadzone should be around the middle
+      newval = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], 100.0, -100.0);
+
+      if (abs(newval) < RC_DZPERCENT[i]) {
+        // reset to the midpoint if we are in the deadzone
+        RC_VALUES[i] = RC_MID[i];
+      }
+
+    } else if (RC_CHANNEL_MODE[i] == 1) {
+      // if this is a throttle, our deadzone should be at the low point
+      newval = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], 100.0, 0.0);
+
+      if (abs(newval) < RC_DZPERCENT[i]) {
+        // reset to the low point if we are in the deadzone
+        RC_VALUES[i] = RC_LOW[i];
+      }
+    }
+  }
+}
+
+
+//function to invert values if needed
+void rc_invert_values() {
+
+  // loop through the channels
+
+  for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+    // do we need to invert?
+    if (RC_INVERT[i] == 1) {
+
+      if (RC_CHANNEL_MODE[i] == 0) {
+
+        // if this is a joystick with a midpoint
+        RC_VALUES[i] = (RC_HIGH[i] + RC_LOW[i]) - RC_VALUES[i];
+
+      } else if (RC_CHANNEL_MODE[i] == 1) {
+
+        // if this is a throttle
+        RC_VALUES[i] = RC_HIGH[i] - (RC_VALUES[i] - RC_LOW[i]);
+      }
+    }
+
+    // a little clipping to make sure we dont go over or under the bounds
+
+    // clip the high range so it doesnt go over the max
+    if (RC_VALUES[i] > RC_HIGH[i]) {
+      RC_VALUES[i] = RC_HIGH[i];
+    }
+
+    // clip the low range so it doesnt go under the min
+    if (RC_VALUES[i] < RC_LOW[i]) {
+      RC_VALUES[i] = RC_LOW[i];
+    }
+  }
+}
+
+//process failsafe
+void processFailsafe() {
+
+  //temporarily reset failsafe while we calculate where we are
+  failsafeActive = false;
+
+  // see if any channels have failed
+  for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+
+    // Lets convert our range into -100 to 100 so we can compare against our deadzone percent
+    float newval = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], 100.0, 0);
+
+    if (abs(newval) > 105.0) {
+
+      //failsafe active, we are way out of range of where we should be, likely the controller
+      // lost battery or went out of range
+      failsafeActive = true;
+    }
+  }
+
+  // if we triggered a failsafe, we need to set all the channels to their failsafe value
+  // in my experience, only channel 1 goes out of bounds in these situations
+  if (failsafeActive == true) {
+    for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+      RC_VALUES[i] = RC_FAILSAFE_VALUE[i];
+    }
+  }
+}
+
+// translate values to percentages
+void rc_translate_values() {
+
+  // Loop through all our channels
+  for (int i = 0; i < RC_NUM_CHANNELS; i++) {
+
+    // translate the RC channel value into our new number range
+    RC_TRANSLATED_VALUES[i] = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], RC_TRANSLATED_HIGH[i], RC_TRANSLATED_LOW[i]);
+  }
+}
+
+
+//calls translate value functions
+float translateValueIntoNewRange(float currentvalue, float currentmax, float currentmin, float newmax, float newmin) {
+  // Use this formula to work out where we are in the new range
+  // NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
+  //
+  // this formula was lovingly stolen from https://stackoverflow.com/questions/929103/convert-a-number-range-to-another-range-maintaining-ratio
+
+  return (((currentvalue - currentmin) * (newmax - newmin)) / (currentmax - currentmin)) + newmin;
+}
