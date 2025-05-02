@@ -1,6 +1,3 @@
-#include "DualG2HighPowerMotorShield.h"
-DualG2HighPowerMotorShield18v18 md;
-
 int upperLimit = 0; //high until pressed
 int lowerLimit = 0; //high until limit is pressed
 
@@ -17,6 +14,8 @@ int lowerLimit = 0; //high until limit is pressed
 
 #define RC_CH1_INPUT  3 //pin 
 #define RC_CH2_INPUT  2 //pin
+
+//#define RC_OUTPUT pin number -------------------------------------------------------------------------------------------
 
 uint16_t RC_VALUES[RC_NUM_CHANNELS];
 uint32_t RC_START[RC_NUM_CHANNELS];
@@ -51,26 +50,6 @@ uint16_t RC_INVERT[RC_NUM_CHANNELS] = { 0, 0};
 uint16_t RC_DZPERCENT[RC_NUM_CHANNELS] = { 30, 30 };
 
 
-// motor controller failsafe 
-void stopIfFault()
-{
-  if (md.getM1Fault()) // condition if motor 1 fails 
-  {
-    md.disableDrivers();
-    delay(1);
-    Serial.println("M1 fault");
-    while (1);
-  }
-  if (md.getM2Fault()) // condition if motor 2 fails 
-  {
-    md.disableDrivers();
-    delay(1);
-    Serial.println("M2 fault");
-    while (1);
-  }
-}
-
-
 //setup code that runs once 
 void setup() {
   Serial.begin(SERIAL_PORT_SPEED); //speed for arduino to transmit to computer when plugged in
@@ -85,17 +64,8 @@ void setup() {
 
   pinMode (5, INPUT); //Lower Limit Switch
 
+//pinMode (RC_OUTPUT, OUTPUT); ----------------------------------------------------------------------------------------------------------------------
 
-  //initialize motor controller 
-  Serial.println("Dual G2 High Power Motor Shield");
-  md.init();
-  md.calibrateCurrentOffsets();
- 
-  delay(10);
- 
-  // Uncomment to flip a motor's direction:
-  //md.flipM1(true);
-  //md.flipM2(true);
 }
 
 unsigned long current = 0; //current time 
@@ -139,14 +109,6 @@ void loop() {
     }
 
     md.setM1Speed(speed); // send speed to the motor 
-
-    stopIfFault(); // disable if problems 
-
-    if (speed%200 == 100) // print to console 
-    {
-      Serial.print("M1 current: ");
-      Serial.println(md.getM1CurrentMilliamps());
-    }
 
     delay(2);
   }
