@@ -1,6 +1,3 @@
-#include "DualG2HighPowerMotorShield.h"
-DualG2HighPowerMotorShield18v18 md;
-
 int upperLimit = 0; //high until pressed
 int lowerLimit = 0; //high until limit is pressed
 
@@ -17,6 +14,9 @@ int lowerLimit = 0; //high until limit is pressed
 
 #define RC_CH1_INPUT  3 //pin 
 #define RC_CH2_INPUT  2 //pin
+
+#define RC_OUTPUT_9 // output for lift motor
+#define RC_OUTPUT_10 // output for lift motor
 
 uint16_t RC_VALUES[RC_NUM_CHANNELS];
 uint32_t RC_START[RC_NUM_CHANNELS];
@@ -35,40 +35,12 @@ uint16_t RC_FAILSAFE_VALUE[RC_NUM_CHANNELS] = { 1300, 1508 }; // values to set t
 // 2 = a a switch (either on or off)
 uint16_t RC_CHANNEL_MODE[RC_NUM_CHANNELS] = { 0, 0 };
 
-// a place to store our mapped values
-float RC_TRANSLATED_VALUES[RC_NUM_CHANNELS];
-
-// some boundaries for our mapped values
-float RC_TRANSLATED_LOW[RC_NUM_CHANNELS] = { -100, -100};
-float RC_TRANSLATED_MID[RC_NUM_CHANNELS] = { 0, 0 };
-float RC_TRANSLATED_HIGH[RC_NUM_CHANNELS] = { 100, 100 };
-
 // Do we need to invert the input? 1 = yes, 0 = no
 // Use this if your joystick goes the wrong way
 uint16_t RC_INVERT[RC_NUM_CHANNELS] = { 0, 0};
 
 // What percentage deadzone is allowed? values in percent e.g. 10 = 10%
 uint16_t RC_DZPERCENT[RC_NUM_CHANNELS] = { 30, 30 };
-
-
-// motor controller failsafe 
-void stopIfFault()
-{
-  if (md.getM1Fault()) // condition if motor 1 fails 
-  {
-    md.disableDrivers();
-    delay(1);
-    Serial.println("M1 fault");
-    while (1);
-  }
-  if (md.getM2Fault()) // condition if motor 2 fails 
-  {
-    md.disableDrivers();
-    delay(1);
-    Serial.println("M2 fault");
-    while (1);
-  }
-}
 
 
 //setup code that runs once 
@@ -85,17 +57,8 @@ void setup() {
 
   pinMode (5, INPUT); //Lower Limit Switch
 
+//pinMode (RC_OUTPUT, OUTPUT); ----------------------------------------------------------------------------------------------------------------------
 
-  //initialize motor controller 
-  Serial.println("Dual G2 High Power Motor Shield");
-  md.init();
-  md.calibrateCurrentOffsets();
- 
-  delay(10);
- 
-  // Uncomment to flip a motor's direction:
-  //md.flipM1(true);
-  //md.flipM2(true);
 }
 
 unsigned long current = 0; //current time 
@@ -118,8 +81,6 @@ void loop() {
     rc_deadzone_adjust(); // add deadzone to the sticks 
   }
 
-  rc_translate_values(); // translate rc values to a percentage 
-
   upperLimit = digitalRead(11); // check upper limit switch
 
   lowerLimit = digitalRead(5); // check lower limit switch 
@@ -128,94 +89,20 @@ void loop() {
 
   delay(1);  // The drivers require a maximum of 1ms to elapse when brought out of sleep mode.
 
-  if(RC_TRANSLATED_VALUES[0] > 0 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
+  if(RC_VALUES[0] > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    md.setM2Speed(0); // stop other motor 
-    int speed = 0; // value to calculate speed 
-    if(verticalSpeed < maxSpeed){ // see if we are at max speed
-      speed = verticalSpeed + 1; //increase speed
-    } else {
-      speed = verticalSpeed; // maintain speed
-    }
-
-    md.setM1Speed(speed); // send speed to the motor 
-
-    stopIfFault(); // disable if problems 
-
-    if (speed%200 == 100) // print to console 
-    {
-      Serial.print("M1 current: ");
-      Serial.println(md.getM1CurrentMilliamps());
-    }
+    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
 
     delay(2);
   }
-  else if(RC_TRANSLATED_VALUES[0] < 0 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
+  else if(RC_VALUES[0] < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    md.setM2Speed(0); // stop other motor 
-    int speed = 0; // value to calculate speed
-    if(verticalSpeed > (-1 * maxSpeed)){ // see if we are at max negative speed
-      speed = verticalSpeed - 1; // increase speed in negative direction 
-    } else {
-      speed = verticalSpeed; // maintain speed 
-    }
+    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
 
-    md.setM1Speed(speed); // send speed to motor 
-
-    stopIfFault(); // disable if problems 
-
-    if (speed%200 == 100) // print to console 
-    {
-      Serial.print("M1 current: ");
-      Serial.println(md.getM1CurrentMilliamps());
-    }
     delay(2);
   }
-  else if(RC_TRANSLATED_VALUES[1] > 0) // if signal to move forwards
-  {
-    md.setM1Speed(0); // stop other motor 
-    int speed = 0; //value to set speed
-    if(horizontalSpeed < maxSpeed){ // if we are not yet at max speed
-      speed = horizontalSpeed + 1; // increase speed
-    } else {
-      speed = horizontalSpeed; // maintain speed
-    }
-    md.setM2Speed(speed);  // send speed to motor
 
-    stopIfFault(); // disable if issues
-    if (speed%200 == 100)
-    {
-      Serial.print("M2 current: ");
-      Serial.println(md.getM2CurrentMilliamps());
-    }
-    delay(2);
-  }
-  else if(RC_TRANSLATED_VALUES[1] < 0) //backwards
-  {
-    md.setM1Speed(0); // stop other motor 
-    int speed = 0; // value to hold speed 
-    if(horizontalSpeed > (-1 * maxSpeed)){ // see if we are at max negative speed
-      speed = horizontalSpeed - 1; // lower speed
-    } else {
-      speed = horizontalSpeed; // maintain speed
-    }
-    md.setM2Speed(speed); // send speed to motor 
-
-    stopIfFault(); // disable if issues 
-
-    if (speed%200 == 100)
-    {
-      Serial.print("M2 current: ");
-      Serial.println(md.getM2CurrentMilliamps());
-    }
-    delay(2);
-  }
-  else // if no input 
-  { // turn off all motors 
-    md.setM1Speed(0);
-    md.setM2Speed(0);
-    stopIfFault();
-  }
+  digitalWrite(RC_OUTPUT_2, RC_VALUES[1])
 
   // keep track of time
   current = micros();
@@ -235,16 +122,16 @@ void loop() {
       Serial.print("CH");
       Serial.print(i);
       Serial.print(":");
-      Serial.print(RC_TRANSLATED_VALUES[i]);
+      Serial.print(RC_VALUES[i]);
       Serial.print(",");
     }
 
     //Use Ch1 as a reference point for low and high and plot them
     Serial.print("LOW:");
-    Serial.print(RC_TRANSLATED_LOW[0]);
+    Serial.print(RC_LOW[0]);
     Serial.print(",");
     Serial.print("HIGH:");
-    Serial.print(RC_TRANSLATED_HIGH[0]);
+    Serial.print(RC_HIGH[0]);
 
     // if failsafe is active, display on the serial but also plot it as a visual aid
     if (failsafeActive == true) {
@@ -384,7 +271,7 @@ void rc_translate_values() {
   for (int i = 0; i < RC_NUM_CHANNELS; i++) {
 
     // translate the RC channel value into our new number range
-    RC_TRANSLATED_VALUES[i] = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], RC_TRANSLATED_HIGH[i], RC_TRANSLATED_LOW[i]);
+    RC_VALUES[i] = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], RC_TRANSLATED_HIGH[i], RC_TRANSLATED_LOW[i]);
   }
 }
 
