@@ -15,8 +15,8 @@ int lowerLimit = 0; //high until limit is pressed
 #define RC_CH1_INPUT  3 //pin 
 #define RC_CH2_INPUT  2 //pin
 
-#define RC_OUTPUT_9 // output for lift motor
-#define RC_OUTPUT_10 // output for lift motor
+#define RC_OUTPUT_9  9// output for lift motor
+#define RC_OUTPUT_10  10// output for lift motor
 
 uint16_t RC_VALUES[RC_NUM_CHANNELS];
 uint32_t RC_START[RC_NUM_CHANNELS];
@@ -57,8 +57,8 @@ void setup() {
 
   pinMode (5, INPUT); //Lower Limit Switch
 
-//pinMode (RC_OUTPUT, OUTPUT); ----------------------------------------------------------------------------------------------------------------------
-
+pinMode (RC_OUTPUT_9, OUTPUT);
+pinMode (RC_OUTPUT_10, OUTPUT); 
 }
 
 unsigned long current = 0; //current time 
@@ -85,24 +85,22 @@ void loop() {
 
   lowerLimit = digitalRead(5); // check lower limit switch 
 
-  md.enableDrivers(); // enable motor drivers for the speed controller 
-
   delay(1);  // The drivers require a maximum of 1ms to elapse when brought out of sleep mode.
 
   if(RC_VALUES[0] > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
+    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
   else if(RC_VALUES[0] < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
+    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
 
-  digitalWrite(RC_OUTPUT_2, RC_VALUES[1])
+  digitalWrite(RC_OUTPUT_10, RC_VALUES[1]);
 
   // keep track of time
   current = micros();
@@ -263,18 +261,6 @@ void processFailsafe() {
     }
   }
 }
-
-// translate values to percentages
-void rc_translate_values() {
-
-  // Loop through all our channels
-  for (int i = 0; i < RC_NUM_CHANNELS; i++) {
-
-    // translate the RC channel value into our new number range
-    RC_VALUES[i] = translateValueIntoNewRange((float)RC_VALUES[i], (float)RC_HIGH[i], (float)RC_LOW[i], RC_TRANSLATED_HIGH[i], RC_TRANSLATED_LOW[i]);
-  }
-}
-
 
 //calls translate value functions
 float translateValueIntoNewRange(float currentvalue, float currentmax, float currentmin, float newmax, float newmin) {
