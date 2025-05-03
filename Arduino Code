@@ -15,7 +15,8 @@ int lowerLimit = 0; //high until limit is pressed
 #define RC_CH1_INPUT  3 //pin 
 #define RC_CH2_INPUT  2 //pin
 
-//#define RC_OUTPUT pin number -------------------------------------------------------------------------------------------
+//#define RC_OUTPUT_1 pin number -------------------------------------------------------------------------------------------
+//#define RC_OUTPUT_2 pin number -------------------------------------------------------------------------------------------
 
 uint16_t RC_VALUES[RC_NUM_CHANNELS];
 uint32_t RC_START[RC_NUM_CHANNELS];
@@ -88,36 +89,20 @@ void loop() {
 
   delay(1);  // The drivers require a maximum of 1ms to elapse when brought out of sleep mode.
 
-  if(RC_VALUES[0] > 0 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
+  if(RC_VALUES[0] > 2.5 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    digitalWrite(RC_OUTPUT, RC_VALUES[0])
+    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
 
     delay(2);
   }
-  else if(RC_VALUES[0] < 0 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
+  else if(RC_VALUES[0] < 2.5 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    digitalWrite(RC_OUTPUT, RC_VALUES[0])
+    digitalWrite(RC_OUTPUT_1, RC_VALUES[0])
 
     delay(2);
   }
-  else if(RC_VALUES[1] > 0) // if signal to move forwards
-  {
-    digitalWrite(RC_OUTPUT, RC_VALUES[1])
 
-    delay(2);
-  }
-  else if(RC_VALUES[1] < 0) //backwards
-  {
-    digitalWrite(RC_OUTPUT, RC_VALUES[1])
-
-    delay(2);
-  }
-  else // if no input 
-  { // turn off all motors 
-    md.setM1Speed(0);
-    md.setM2Speed(0);
-    stopIfFault();
-  }
+  digitalWrite(RC_OUTPUT_2, RC_VALUES[1])
 
   // keep track of time
   current = micros();
