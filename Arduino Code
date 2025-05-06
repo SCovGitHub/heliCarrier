@@ -15,12 +15,19 @@ int RC_LEFT_RIGHT = 0;
 #define RC_OUTPUT_9  9// output for lift motor
 #define RC_OUTPUT_10  10// output for lift motor
 
+uint16_t RC_VALUES[RC_NUM_CHANNELS];
+uint32_t RC_START[RC_NUM_CHANNELS];
+volatile uint16_t RC_SHARED[RC_NUM_CHANNELS];
+
 //setup code that runs once 
 void setup() {
   Serial.begin(SERIAL_PORT_SPEED); //speed for arduino to transmit to computer when plugged in
 
   pinMode(RC_CH1_INPUT, INPUT); // marks the channel 1 pin as an input 
   pinMode(RC_CH2_INPUT, INPUT); // marks the channel 2 pin as an input
+
+  attachInterrupt(digitalPinToInterrupt(RC_CH1_INPUT), READ_RC1, CHANGE); // read digital interrupts when the values from these pins change 
+  attachInterrupt(digitalPinToInterrupt(RC_CH2_INPUT), READ_RC2, CHANGE);
   
   pinMode (11, INPUT); //Upper Limit Switch
 
@@ -34,27 +41,51 @@ void setup() {
 
 void loop() {
 
-  RC_UP_DOWN = digitalRead(RC_CH1_INPUT);
+  rc_read_values(); // read values from the RC
 
-  RC_LEFT_RIGHT = digitalRead(RC_CH2_INPUT);
 
   upperLimit = digitalRead(11); // check upper limit switch
 
   lowerLimit = digitalRead(5); // check lower limit switch 
 
-  if(RC_UP_DOWN > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
+  if(RC_VALUES[0] > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    digitalWrite(RC_OUTPUT_9, RC_UP_DOWN);
+    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
-  else if(RC_UP_DOWN < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
+  else if(RC_VALUES[0] < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    digitalWrite(RC_OUTPUT_9, RC_UP_DOWN);
+    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
 
-  digitalWrite(RC_OUTPUT_10, RC_LEFT_RIGHT);
+  digitalWrite(RC_OUTPUT_10, RC_VALUES[1]);
 
+}
+
+void READ_RC1() {
+  Read_Input(RC_CH1, RC_CH1_INPUT);
+}
+
+// read input for channel 2
+void READ_RC2() {
+  Read_Input(RC_CH2, RC_CH2_INPUT);
+}
+
+//read input 
+void Read_Input(uint8_t channel, uint8_t input_pin){
+  if (digitalRead(input_pin) == HIGH){
+    RC_START[channel] = micros();
+  } else {
+    uint16_t rc_compare = (uint16_t)(micros() - RC_START[channel]);
+    RC_SHARED[channel] = rc_compare;
+  }
+}
+
+void rc_read_values(){
+  noInterrupts();
+  memcpy(RC_VALUES, (const void *)RC_SHARED, sizeof(RC_SHARED));
+  interrupts();
 }
