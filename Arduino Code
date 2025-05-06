@@ -48,6 +48,18 @@ void loop() {
 
   lowerLimit = digitalRead(5); // check lower limit switch 
 
+  Serial.println("Upper Limit");
+  Serial.println(upperLimit);
+
+  Serial.println("Lower Limit");
+  Serial.println(lowerLimit);
+
+  Serial.println("Channel 1");
+  Serial.println(RC_VALUES[0]);
+
+  Serial.println("Channel 2");
+  Serial.println(RC_VALUES[1]);
+
   if(RC_VALUES[0] > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
     analogWrite(RC_OUTPUT_9, RC_VALUES[0]);
