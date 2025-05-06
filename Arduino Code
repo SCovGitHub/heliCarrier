@@ -31,17 +31,7 @@ void setup() {
 
   pinMode (5, INPUT); //Lower Limit Switch
 
-//pinMode (RC_OUTPUT, OUTPUT); ----------------------------------------------------------------------------------------------------------------------
-
 }
-
-unsigned long current = 0; //current time 
-
-unsigned long prev = 0; //last recorded time 
-
-const unsigned long interval = 100000UL; // interval between reading values to send to computer 
-
-bool failsafeActive = true; // failsafe that gets turned off if we recieve conroller signal
 
 void loop() {
 
@@ -68,6 +58,4 @@ void loop() {
 
   digitalWrite(RC_OUTPUT_2, RC_LEFT_RIGHT)
 
-  // keep track of time
-  current = micros();
 }
