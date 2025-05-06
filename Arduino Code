@@ -20,12 +20,16 @@ void setup() {
   pinMode(RC_CH1_INPUT, INPUT); // marks the channel 1 pin as an input 
   pinMode(RC_CH2_INPUT, INPUT); // marks the channel 2 pin as an input
 
-  attachInterrupt(digitalPinToInterrupt(RC_CH1_INPUT), digitalRead(RC_OUTPUT_9), CHANGE); // read digital interrupts when the values from these pins change 
-  attachInterrupt(digitalPinToInterrupt(RC_CH2_INPUT), digitalRead(RC_OUTPUT_10), CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RC_CH1_INPUT), digitalRead(RC_CH1_INPUT), CHANGE); // read digital interrupts when the values from these pins change 
+  attachInterrupt(digitalPinToInterrupt(RC_CH2_INPUT), digitalRead(RC_CH2_INPUT), CHANGE);
   
   pinMode (11, INPUT); //Upper Limit Switch
 
   pinMode (5, INPUT); //Lower Limit Switch
+
+  pinMode (9, OUTPUT);
+
+  pinMode (10, OUTPUT);
 
 }
 
