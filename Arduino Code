@@ -50,18 +50,20 @@ void loop() {
 
   if(RC_VALUES[0] > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
+    analogWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
   else if(RC_VALUES[0] < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    digitalWrite(RC_OUTPUT_9, RC_VALUES[0]);
+    analogWrite(RC_OUTPUT_9, RC_VALUES[0]);
 
     delay(2);
   }
 
-  digitalWrite(RC_OUTPUT_10, RC_VALUES[1]);
+  analogWrite(RC_OUTPUT_10, RC_VALUES[1]);
+
+  delay(2);
 
 }
 
