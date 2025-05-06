@@ -13,10 +13,6 @@ int lowerLimit = 0; //high until limit is pressed
 #define RC_OUTPUT_9 // output for lift motor
 #define RC_OUTPUT_10 // output for lift motor
 
-uint16_t RC_VALUES[RC_NUM_CHANNELS];
-uint32_t RC_START[RC_NUM_CHANNELS];
-volatile uint16_t RC_SHARED[RC_NUM_CHANNELS];
-
 //setup code that runs once 
 void setup() {
   Serial.begin(SERIAL_PORT_SPEED); //speed for arduino to transmit to computer when plugged in
