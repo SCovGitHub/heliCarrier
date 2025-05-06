@@ -1,5 +1,7 @@
 int upperLimit = 0; //high until pressed
 int lowerLimit = 0; //high until limit is pressed
+int RC_UP_DOWN = 0;
+int RC_LEFT_RIGHT = 0;
 #define SERIAL_PORT_SPEED  115200
 
 #define RC_NUM_CHANNELS  2 // one for up down and one for left right 
@@ -19,9 +21,6 @@ void setup() {
 
   pinMode(RC_CH1_INPUT, INPUT); // marks the channel 1 pin as an input 
   pinMode(RC_CH2_INPUT, INPUT); // marks the channel 2 pin as an input
-
-  attachInterrupt(digitalPinToInterrupt(RC_CH1_INPUT), digitalRead(RC_CH1_INPUT), CHANGE); // read digital interrupts when the values from these pins change 
-  attachInterrupt(digitalPinToInterrupt(RC_CH2_INPUT), digitalRead(RC_CH2_INPUT), CHANGE);
   
   pinMode (11, INPUT); //Upper Limit Switch
 
@@ -35,9 +34,9 @@ void setup() {
 
 void loop() {
 
-  RC_UP_DOWN = digitalRead(RC_OUTPUT_9);
+  RC_UP_DOWN = digitalRead(RC_CH1_INPUT);
 
-  RC_LEFT_RIGHT = digitalRead(RC_OUTPUT_10);
+  RC_LEFT_RIGHT = digitalRead(RC_CH2_INPUT);
 
   upperLimit = digitalRead(11); // check upper limit switch
 
@@ -45,17 +44,17 @@ void loop() {
 
   if(RC_UP_DOWN > .25 && upperLimit == HIGH) //if signal to move up and limit switch has not been triggered
   {
-    digitalWrite(RC_OUTPUT_1, RC_UP_DOWN);
+    digitalWrite(RC_OUTPUT_9, RC_UP_DOWN);
 
     delay(2);
   }
   else if(RC_UP_DOWN < .25 && lowerLimit==HIGH) // if signal to move down and limit switch has not been triggered 
   {
-    digitalWrite(RC_OUTPUT_1, RC_UP_DOWN);
+    digitalWrite(RC_OUTPUT_9, RC_UP_DOWN);
 
     delay(2);
   }
 
-  digitalWrite(RC_OUTPUT_2, RC_LEFT_RIGHT);
+  digitalWrite(RC_OUTPUT_10, RC_LEFT_RIGHT);
 
 }
